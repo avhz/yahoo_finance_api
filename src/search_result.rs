@@ -1,6 +1,9 @@
 use select::document::Document;
 use select::predicate::{Class, Name};
 use serde::Deserialize;
+use time::format_description::parse;
+use time::macros::format_description;
+use time::OffsetDateTime;
 
 use super::YahooError;
 
@@ -116,7 +119,7 @@ impl YSearchResult {
 pub struct YOptionResult {
     pub name: String,
     pub strike: f64,
-    pub last_trade_date: String,
+    pub last_trade_date: OffsetDateTime,
     pub last_price: f64,
     pub bid: f64,
     pub ask: f64,
@@ -149,9 +152,17 @@ impl YOptionResults {
                     cols
                 })
                 .map(|sv| {
+                    println!("LTD: {}", &sv[1]);
                     YOptionResult {
                         name: sv[0].clone(),
-                        last_trade_date: sv[1].clone(),
+                        // last_trade_date: sv[1].clone(),
+                        // last_trade_date: sv[1].pars,
+                        // last_trade_date: "2023-05-30 9:30AM EDT"
+                        last_trade_date: OffsetDateTime::parse(
+                            &sv[1].chars().filter(|c| c.is_digit(10)).into(), //[00..sv[1].len() - 6],                                 /*[..10]*/
+                            format_description!("[year]-[month]-[day] [hour]:[minute]"), // [hour]:[minute][period case:upper] [ignore count:3]"),
+                        )
+                        .unwrap(),
                         strike: sv[2].replace(",", "").parse::<f64>().unwrap_or(0.0),
                         last_price: sv[3].replace(",", "").parse::<f64>().unwrap_or(0.0),
                         bid: sv[4].replace(",", "").parse::<f64>().unwrap_or(0.0),
@@ -177,6 +188,37 @@ impl YOptionResults {
             Self {
                 options: Vec::new(),
             }
+        }
+    }
+}
+
+#[cfg(test)]
+
+mod test_options {
+
+    use crate::YahooConnector;
+
+    use super::*;
+
+    #[test]
+
+    fn test_option_chain() {
+        let provider = YahooConnector::new();
+
+        let resp = tokio_test::block_on(provider.search_options("AAPL")).unwrap();
+
+        println!("All options found on stock 'AAPL':");
+
+        for item in resp.options {
+            println!("{:?}", item);
+
+            // println!(
+
+            // "name: {}, strike: {}, last trade date: {}",
+
+            // item.name, item.strike, item.last_trade_date
+
+            // );
         }
     }
 }
